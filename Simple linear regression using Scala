@@ -1,0 +1,61 @@
+import org.apache.spark.sql.types.{StructField, StructType, StringType, IntegerType, LongType}
+import sqlContext.implicits._
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.Pipeline
+
+// Reading the file
+
+val mySchema = StructType(Array(
+StructField("x", IntegerType, true),
+StructField("y", IntegerType, true)//creating schema
+))
+
+print("Reading the data \n")
+
+val df = spark
+           .read
+           .schema(mySchema)
+           .option("header", "true") // first line is the header data
+           .csv("/FileStore/tables/SparkScala-5.csv")
+
+print("Converting Dataframe to Dataset \n")
+case class Flight(x: Int, y: Int)
+val fdata1 = df.as[Flight]
+
+val fdata = df.withColumnRenamed("y", "label")
+
+fdata.show()
+
+//Creating vector assembler
+val assembler = new VectorAssembler()
+  .setInputCols(Array("x"))
+  .setOutputCol("features")
+
+val output = assembler.transform(fdata)
+
+// Using columns features and labels
+val data = output.select("features","label")
+data.show()
+
+//Linear regression
+val lr = new LinearRegression()
+
+val lrModel = lr.fit(data)
+
+println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
+
+val trainingSummary = lrModel.summary
+
+val MSE1 = (s"${trainingSummary.rootMeanSquaredError}").toDouble
+val MSE:Double = math.pow(MSE1,2)
+//println(f"MSE: ${MSE}%2.2f")
+val SSE = (10*MSE)
+println(f"SSE: ${SSE}%2.2f")
+//println(f"RMSE: ${trainingSummary.rootMeanSquaredError}%2.2f")
+//println(f"r2: ${trainingSummary.r2}%2.2f")
+val r =   (s"${trainingSummary.r2}").toDouble
+val SSR:Double = (r*SSE)/(1-r)
+val SST:Double = (SSR+SSE)
+println(f"SSR: ${SSR}%2.2f")
+println(f"SST: ${SST}%2.2f")
