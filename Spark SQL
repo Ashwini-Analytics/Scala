@@ -1,0 +1,60 @@
+
+
+import org.apache.spark.sql.{ SparkSession, SQLImplicits}
+import org.apache.spark.sql.{Dataset, DataFrame, Row}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.log4j.{Level, Logger}
+import java.io._
+
+
+Logger.getLogger("org")setLevel(Level.OFF)
+
+val sparksess = SparkSession
+   .builder()
+   .appName("mytest")
+   .master("Local[*]")
+   .getOrCreate()
+
+val myschema = sparksess.read.format("csv")
+.option("inferSchema", "true")
+.option("header", "true")
+.load("FileStore/tables/2015_summary-ebaee.csv")
+.schema
+  
+val flightData = spark.read
+  .schema(myschema)
+  .option("header", "true")
+  .csv("/FileStore/tables/2015_summary-ebaee.csv") // flight data
+
+
+
+
+// Show top 20 rows
+flightData.show()
+
+// Rename the column 
+flightData.withColumnRenamed("DEST_COUNTRY_NAME","D_COUNTRY_NAME")
+          .withColumnRenamed("ORIGIN_COUNTRY_NAME","O_COUNTRY_NAME")
+    .printSchema()
+
+//sort the data 
+flightData.sort($"count").show(10)
+
+//Construct a case class and convert the DataFrame to a Dataset 
+case class Flight(DEST_COUNTRY_NAME: String, ORIGIN_COUNTRY_NAME: String, count: BigInt)
+
+val flights = flightData.as[Flight]
+flights.show()
+
+//Convert your Dataset to a SQL table and use SQL to select the columns and print out the top 10
+
+flights.createOrReplaceTempView("FlightData") //Creates a new temporary view using a SparkDataFrame in the Spark Session.
+val maxSql = spark.sql(""" 
+             SELECT DEST_COUNTRY_NAME, sum(count) as Dtotal
+             From FlightData
+             GROUP BY DEST_COUNTRY_NAME
+             ORDER BY sum(count) DESC
+             LIMIT 10""")
+maxSql.show()
