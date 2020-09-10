@@ -1,0 +1,61 @@
+import scala.io._
+import scala.math._
+
+type S= String;
+type D = Double;
+type V = Vector[D]
+
+def mean(v:V):D = v.sum/v.length
+
+def centered(v:V):V = v.map{ _ - mean(v)}
+
+def dot(v:V, w:V):D = (v zip w).map{case (x,y) => x*y}.sum
+
+def norm(v:V):D = sqrt(dot(v,v))
+
+def multiplyByScalar(b:D, v:V):V = v.map{b * _ }
+
+def subtract (v:V, w:V):V = (v zip w).map{ case(velem, welem) => velem - welem}
+
+def regressionCoeff(v:V, w:V):D = {
+  val temp = dot(centered(v), centered(v))
+  dot(centered(v),centered(w))/temp
+}
+
+import scala.io.Source
+
+val filename = "/FileStore/tables/SparkScala-6.csv"
+val rawData = Source.fromFile(filename).getLines().toList
+val separateTuples = rawData.map{line => {
+  val Array(s,t) = line.split(",")
+  (s.toDouble, t.toDouble)
+
+}}
+println(s"initial tuples $separateTuples")
+
+val sortedTuples = separateTuples.sortBy(_._1)
+println(s"sorted $sortedTuples")
+
+val (ss,ts) = sortedTuples.unzip
+val Xraw = ss.toVector
+val Yraw = ts.toVector
+println(Xraw.length)
+
+val xc = centered(Xraw)
+val yc = centered(Yraw)
+
+println(s"centered x $xc y $yc")
+val b = regressionCoeff(xc,yc)
+val intercept:D = mean(Yraw) - regressionCoeff(Xraw,Yraw) * mean(Xraw)
+println(s"regression $b%2.2f , intercept &intercept%2.2f")
+
+val SST = dot(yc,yc)
+
+val errorVec = subtract(yc, multiplyByScalar(b,xc))
+val SSE = dot(errorVec,errorVec)
+val regressionVec = multiplyByScalar(b,xc)
+val SSR = dot(regressionVec, regressionVec)
+
+println(s" SST = $SST")
+println(s" SSR = $SSR")
+println(s" SSE = $SSE")
